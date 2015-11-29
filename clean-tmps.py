@@ -108,9 +108,6 @@ print("Removing old temporary files:")
 
 for tmp_dir in tmp_dirs:
     for dir_path, dir_names, file_names in os.walk(tmp_dir):
-        # TODO: if a symlink under a directory points to that directory,
-        # the symlink won't be removed because it points to an existing item
-        # and the directory won't be removed because it's not empty.
         for file_name in chain(file_names, dir_names):
             file_name = os.path.join(dir_path, file_name)
             if any(fnmatch.fnmatch(file_name, pattern) for pattern in exclusions):
