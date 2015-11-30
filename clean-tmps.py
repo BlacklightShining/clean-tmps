@@ -136,16 +136,19 @@ for tmp_dir in tmp_dirs:
 # deferred_items was compiled in a top-down walk. Iterating over it in reverse
 # gives us items in bottom-up order, so that we unlink children
 # before their parents.
-for path in reversed(deferred_items):
+for path, action in reversed(deferred_items):
     try:
         if action is Action.defer_rmdir_check:
             os.rmdir(path)
         elif action is Action.defer_unsymlink_check:
             if not os.path.exists(path):
                 os.unlink(path)
+        # If this `else` looks redundant, go read the commit after ba2adb9d.
+        else:
+            continue
     except OSError:
         pass
     else:
         if verbose:
-            sys.stdout.buffer.write(file_name)
+            sys.stdout.buffer.write(path)
             sys.stdout.buffer.write(b'\n')
