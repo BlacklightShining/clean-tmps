@@ -108,30 +108,30 @@ print("Removing old temporary files:")
 
 for tmp_dir in tmp_dirs:
     for dir_path, dir_names, file_names in os.walk(tmp_dir):
-        for file_name in chain(file_names, dir_names):
-            file_name = os.path.join(dir_path, file_name)
-            if any(fnmatch.fnmatch(file_name, pattern) for pattern in exclusions):
+        for item_name in chain(file_names, dir_names):
+            item_path = os.path.join(dir_path, item_name)
+            if any(fnmatch.fnmatch(item_name, pattern) for pattern in exclusions):
                 continue
             try:
-                stats = os.stat(file_name, follow_symlinks=False)
+                stats = os.stat(item_path, follow_symlinks=False)
             except OSError:
-                # Can't stat() the file for some reason? Just ignore it, then.
+                # Can't stat() the thing for some reason? Just ignore it, then.
                 pass
             else:
-                action = process(file_name, stats)
+                action = process(item_path, stats)
                 if action is Action.unlink:
                     try:
-                        os.unlink(file_name)
+                        os.unlink(item_path)
                     except OSError:
                         # Can't unlink() the file? Again, just ignore it.
                         pass
                     else:
                         if verbose:
-                            sys.stdout.buffer.write(file_name)
+                            sys.stdout.buffer.write(item_path)
                             sys.stdout.buffer.write(b'\n')
                 elif action in {Action.defer_rmdir_check,
                                 Action.defer_unsymlink_check}:
-                    deferred_items.append((file_name, action))
+                    deferred_items.append((item_path, action))
 
 # deferred_items was compiled in a top-down walk. Iterating over it in reverse
 # gives us items in bottom-up order, so that we unlink children
