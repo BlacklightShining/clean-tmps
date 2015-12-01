@@ -7,7 +7,6 @@ from itertools import chain
 import os
 import shlex
 import stat
-import subprocess
 import sys
 import time
 
@@ -38,6 +37,8 @@ def process(path, stats):
             # The symlink is part of a long chain, part of a loop, or broken.
             # We'll treat those all the same.
             return Action.unlink
+        # We don't have the symlink target's path, and we don't need it:
+        # it's only used if the mode in the stats object indicates a symlink.
         target_action = process(None, target_stats)
         if target_action is Action.defer_rmdir_check:
             return Action.defer_unsymlink_check
@@ -45,11 +46,13 @@ def process(path, stats):
     timestamps = [stats.st_mtime]
     if not stat.S_ISDIR(mode):
         timestamps.extend([stats.st_ctime, stats.st_atime])
-    return (
-        (Action.defer_rmdir_check if stat.S_ISDIR(mode) else Action.unlink)
-        if all(timestamp <= THRESHOLD for timestamp in timestamps)
-        else Action.skip
-        )
+    if all(timestamp <= THRESHOLD for timestamp in timestamps):
+        if stat.S_ISDIR(mode):
+            return Action.defer_rmdir_check
+        else:
+            return Action.unlink
+    else:
+        return Action.skip
 
 
 try:
@@ -64,13 +67,13 @@ if not already_running:
         pass
     else:
         os.environb[b'CLEAN_TMPS_RUNNING'] = str(int(True)).encode('utf-8')
-        command = (
-            b'set -a;'
-            b'. /etc/defaults/periodic.conf;'
-            b'source_periodic_confs;' +
-            os.fsencode(shlex.quote(sys.argv[0])) + b';'
+        command_string = (
+            b'set -a; '
+            b'. /etc/defaults/periodic.conf; '
+            b'source_periodic_confs; '
+            b'exec ' + os.fsencode(shlex.quote(sys.argv[0])) + b'; '
             )
-        sys.exit(subprocess.run([command], shell=True).returncode)
+        os.execvp(b'sh', [b'sh', b'-c', command_string])
 
 if os.environb.get(b'daily_clean_tmps_enable', b'no').lower() != b'yes':
     sys.exit(0)
