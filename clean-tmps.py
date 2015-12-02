@@ -101,15 +101,15 @@ exclusions.append(b'.vfs_rsrc_streams_*')
 verbose = os.environb.get(b'daily_clean_tmps_verbose', b'no').lower() == b'yes'
 tmp_dirs = os.environb.get(b'daily_clean_tmps_dirs', b'').split()
 
-# Some directories might become empty once we've deleted all the old files.
-# Wait until the end to try deleting directories (but check their timestamps
-# /before/ they get updated when we delete things!)
-deferred_items = []
-
 print()
 print("Removing old temporary files:")
 
 for tmp_dir in tmp_dirs:
+    # Some directories might become empty once we've deleted all the old files.
+    # Wait until the end to try deleting directories (but check their timestamps
+    # /before/ they get updated when we delete things!)
+    deferred_items = []
+
     for dir_path, dir_names, file_names in os.walk(tmp_dir):
         for item_name in chain(file_names, dir_names):
             item_path = os.path.join(dir_path, item_name)
@@ -136,22 +136,22 @@ for tmp_dir in tmp_dirs:
                                 Action.defer_unsymlink_check}:
                     deferred_items.append((item_path, action))
 
-# deferred_items was compiled in a top-down walk. Iterating over it in reverse
-# gives us items in bottom-up order, so that we unlink children
-# before their parents.
-for path, action in reversed(deferred_items):
-    try:
-        if action is Action.defer_rmdir_check:
-            os.rmdir(path)
-        elif action is Action.defer_unsymlink_check:
-            if not os.path.exists(path):
-                os.unlink(path)
-        # If this `else` looks redundant, go read the commit after ba2adb9d.
+    # deferred_items was compiled in a top-down walk. Iterating over it in reverse
+    # gives us items in bottom-up order, so that we unlink children
+    # before their parents.
+    for path, action in reversed(deferred_items):
+        try:
+            if action is Action.defer_rmdir_check:
+                os.rmdir(path)
+            elif action is Action.defer_unsymlink_check:
+                if not os.path.exists(path):
+                    os.unlink(path)
+            # If this `else` seems redundant to you, go read commit 0423da7e.
+            else:
+                continue
+        except OSError:
+            pass
         else:
-            continue
-    except OSError:
-        pass
-    else:
-        if verbose:
-            sys.stdout.buffer.write(path)
-            sys.stdout.buffer.write(b'\n')
+            if verbose:
+                sys.stdout.buffer.write(path)
+                sys.stdout.buffer.write(b'\n')
