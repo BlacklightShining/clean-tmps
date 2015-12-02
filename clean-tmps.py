@@ -54,6 +54,11 @@ def process(path, stats):
     else:
         return Action.skip
 
+def cache_timestamps(timestamps, path):
+    if path not in timestamps:
+        stats = os.stat(path)
+        timestamps[path] = (stats.st_atime_ns, stats.st_mtime_ns)
+
 
 try:
     already_running = int(os.environb.get(b'CLEAN_TMPS_RUNNING', False))
@@ -105,6 +110,7 @@ print()
 print("Removing old temporary files:")
 
 for tmp_dir in tmp_dirs:
+    dir_times = {}
     # Some directories might become empty once we've deleted all the old files.
     # Wait until the end to try deleting directories (but check their timestamps
     # /before/ they get updated when we delete things!)
@@ -124,6 +130,7 @@ for tmp_dir in tmp_dirs:
                 action = process(item_path, stats)
                 if action is Action.unlink:
                     try:
+                        cache_timestamps(dir_times, dir_path)
                         os.unlink(item_path)
                     except OSError:
                         # Can't unlink() the file? Again, just ignore it.
@@ -140,6 +147,7 @@ for tmp_dir in tmp_dirs:
     # gives us items in bottom-up order, so that we unlink children
     # before their parents.
     for path, action in reversed(deferred_items):
+        cache_timestamps(dir_times, os.path.dirname(path))
         try:
             if action is Action.defer_rmdir_check:
                 os.rmdir(path)
@@ -155,3 +163,9 @@ for tmp_dir in tmp_dirs:
             if verbose:
                 sys.stdout.buffer.write(path)
                 sys.stdout.buffer.write(b'\n')
+
+    for path, times in dir_times.items():
+        try:
+            os.utime(path, ns=times)
+        except OSError:
+            pass
